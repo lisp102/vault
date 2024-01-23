@@ -52,6 +52,9 @@ docker-dev: BUILD_TAGS+=testonly
 docker-dev: prep
 	docker build --build-arg VERSION=$(GO_VERSION_MIN) --build-arg BUILD_TAGS="$(BUILD_TAGS)" -f scripts/docker/Dockerfile -t vault:dev .
 
+docker-custom:
+	docker build --build-arg PRODUCT_VERSION="1.15.4+ent" --build-arg PRODUCT_REVISION="780d9977265396e561741bd9045cf1f673a5228a" -f ./Dockerfile --target default -t hashicorp/vault-enterprise:1.15.4-ent .
+
 docker-dev-ui: BUILD_TAGS+=testonly
 docker-dev-ui: prep
 	docker build --build-arg VERSION=$(GO_VERSION_MIN) --build-arg BUILD_TAGS="$(BUILD_TAGS)" -f scripts/docker/Dockerfile.ui -t vault:dev-ui .

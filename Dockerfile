@@ -35,7 +35,43 @@ RUN addgroup ${NAME} && adduser -S -G ${NAME} ${NAME}
 
 RUN apk add --no-cache libcap su-exec dumb-init tzdata
 
-COPY dist/$TARGETOS/$TARGETARCH/$BIN_NAME /bin/
+RUN set -eux; \
+    apk add --no-cache gnupg && \
+    apkArch="$(apk --print-arch)"; \
+    case "$apkArch" in \
+        armhf) ARCH='arm' ;; \
+        s390x) ARCH='s390x' ;; \
+        aarch64) ARCH='arm64' ;; \
+        x86_64) ARCH='amd64' ;; \
+        x86) ARCH='386' ;; \
+        *) echo >&2 "error: unsupported architecture: $apkArch"; exit 1 ;; \
+    esac && \
+    VAULT_GPGKEY=C874011F0AB405110D02105534365D9472D7468F; \
+    found=''; \
+    for server in \
+        hkps://keys.openpgp.org \
+        hkps://keyserver.ubuntu.com \
+        hkps://pgp.mit.edu \
+    ; do \
+        echo "Fetching GPG key $VAULT_GPGKEY from $server"; \
+        gpg --batch --keyserver "$server" --recv-keys "$VAULT_GPGKEY" && found=yes && break; \
+    done; \
+    test -z "$found" && echo >&2 "error: failed to fetch GPG key $VAULT_GPGKEY" && exit 1; \
+    mkdir -p /tmp/build && \
+    cd /tmp/build && \
+    wget https://releases.hashicorp.com/vault/${PRODUCT_VERSION}/vault_${PRODUCT_VERSION}_linux_${ARCH}.zip && \
+    wget https://releases.hashicorp.com/vault/${PRODUCT_VERSION}/vault_${PRODUCT_VERSION}_SHA256SUMS && \
+    wget https://releases.hashicorp.com/vault/${PRODUCT_VERSION}/vault_${PRODUCT_VERSION}_SHA256SUMS.sig && \
+    gpg --batch --verify vault_${PRODUCT_VERSION}_SHA256SUMS.sig vault_${PRODUCT_VERSION}_SHA256SUMS && \
+    grep vault_${PRODUCT_VERSION}_linux_${ARCH}.zip vault_${PRODUCT_VERSION}_SHA256SUMS | sha256sum -c && \
+    unzip -d /tmp/build vault_${PRODUCT_VERSION}_linux_${ARCH}.zip && \
+    cp /tmp/build/vault /bin/vault && \
+    cd /tmp && \
+    rm -rf /tmp/build && \
+    gpgconf --kill dirmngr && \
+    gpgconf --kill gpg-agent && \
+    apk del gnupg && \
+    rm -rf /root/.gnupg
 
 # /vault/logs is made available to use as a location to store audit logs, if
 # desired; /vault/file is made available to use as a location with the file
